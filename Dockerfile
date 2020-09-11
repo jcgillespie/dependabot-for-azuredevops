@@ -1,4 +1,4 @@
-FROM dependabot/dependabot-core:0.118.8
+FROM dependabot/dependabot-core:0.119.3
 
 # Create workspace
 RUN mkdir -p /home/dependabot/
@@ -9,6 +9,7 @@ COPY Gemfile .
 RUN bundle install
 
 # Copy scripts to run.
+COPY config.rb .
 COPY azure_processor.rb .
 COPY run.rb .
 

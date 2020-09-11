@@ -1,19 +1,23 @@
 # frozen_string_literal: true
-
+require_relative 'config'
 require 'dependabot/omnibus'
 
 class AzureProcessor
   class Unathorized < StandardError; end
   class NotFound < StandardError; end
 
-  def initialize(organisation, available_credentials)
-    @organisation = organisation
-    @available_credentials = available_credentials
+  def initialize(config)
+    #organisation, available_credentials, projectWhitelist = [], repoWhitelist = [])
+    @config = config
+    @organisation = config.organisation
+    @available_credentials = config.credentials
 
-    @api_endpoint = "https://dev.azure.com/#{organisation}"
-    @organisation_credentials = available_credentials
+    @api_endpoint = "https://dev.azure.com/#{@organisation}"
+    @organisation_credentials = @available_credentials
                                 .select { |cred| cred['type'] == 'git_source' }
                                 .find { |cred| cred['host'] == 'dev.azure.com' }
+    @validProjects = config.projects
+    @validRepos = config.repos
   end
 
   def process
@@ -32,6 +36,10 @@ class AzureProcessor
   end
 
   def process_project(project)
+    if !( isValidProject(project) )
+      return
+    end
+
     puts "#{@organisation} => #{project[:name]} => Checking repositories..."
 
     response_repos = get("#{@api_endpoint}/#{project[:id]}/_apis/git/repositories")
@@ -47,8 +55,12 @@ class AzureProcessor
   end
 
   def process_repo(project, repo)
+    if !( isValidRepo(repo) )
+      return
+    end
+
     begin
-      puts "#{@organisation} => #{project[:name]} => #{repo[:name]} => Checking for Depenadbot configuration file..."
+      puts "#{@organisation} => #{project[:name]} => #{repo[:name]} => Checking for Dependabot configuration file..."
 
       response_config = get("#{@api_endpoint}/#{project[:id]}/_apis/git/repositories/#{repo[:id]}/items?path=.dependabot/config.yml")
       config = YAML.safe_load(response_config.body)
@@ -56,7 +68,8 @@ class AzureProcessor
       config['update_configs']
         .each { |update_config| process_dependency(project, repo, update_config) }
     rescue NotFound
-      generate_bug_dependabotconfig(project, repo)
+      # generate_bug_dependabotconfig(project, repo)
+      puts "#{@organisation} => #{project[:name]} => #{repo[:name]} => Dependabot configuration file does not exist"
     end
 
     begin
@@ -64,12 +77,13 @@ class AzureProcessor
 
       get("#{@api_endpoint}/#{project[:id]}/_apis/git/repositories/#{repo[:id]}/items?path=azure-pipelines.yml")
     rescue NotFound
-      generate_bug_azurepipeline(project, repo)
+      # generate_bug_azurepipeline(project, repo)
+      puts "#{@organisation} => #{project[:name]} => #{repo[:name]} => Azure Pipeline configuration file does not exist"
     end
   end
 
   def generate_bug_dependabotconfig(project, repo)
-    puts "#{@organisation} => #{project[:name]} => #{repo[:name]} => Depenadbot configuration file does not exist, raising bug if required..."
+    puts "#{@organisation} => #{project[:name]} => #{repo[:name]} => Dependabot configuration file does not exist, raising bug if required..."
 
     bug_title = "[#{repo[:name]}] Configure Dependabot"
     query = { query: "Select [System.Id] From WorkItems Where [System.Title] = '#{bug_title}'" }
@@ -112,7 +126,6 @@ class AzureProcessor
       post_patch("#{@api_endpoint}/#{project[:id]}/_apis/wit/workitems/$Bug?api-version=5.0", content.to_json)
     end
   end
-
   def generate_bug_azurepipeline(project, repo)
     puts "#{@organisation} => #{project[:name]} => #{repo[:name]} => Azure Pipeline configuration file does not exist, raising bug if required..."
 
@@ -440,5 +453,22 @@ class AzureProcessor
     # puts " -> (#{response.status}) #{response.body}"
 
     response
+  end
+
+  def isValidProject(project)
+    #checks project against whitelist, if it exists. If no whitelist, it is valid.
+    if !(@validProjects.any?)
+      return true # no whitelist provided, assume all are valid.
+    else
+      return @validProjects.include?(project[:name]) # project is valid if present.
+    end
+  end
+
+  def isValidRepo(repo)
+    if !(@validRepos.any?)
+      return true # no whitelist provided, assume all are valid
+    else
+      return @validRepos.include?(repo[:name])
+    end
   end
 end
