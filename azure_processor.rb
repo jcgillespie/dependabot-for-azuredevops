@@ -7,10 +7,10 @@ class AzureProcessor
   class NotFound < StandardError; end
 
   def initialize(config)
-    #organisation, available_credentials, projectWhitelist = [], repoWhitelist = [])
     @config = config
     @organisation = config.organisation
     @available_credentials = config.credentials
+    @createBugsIfMissing = config.createBugsIfMissing || false
 
     @api_endpoint = "https://dev.azure.com/#{@organisation}"
     @organisation_credentials = @available_credentials
@@ -68,7 +68,7 @@ class AzureProcessor
       config['update_configs']
         .each { |update_config| process_dependency(project, repo, update_config) }
     rescue NotFound
-      # generate_bug_dependabotconfig(project, repo)
+      generate_bug_dependabotconfig(project, repo)
       puts "#{@organisation} => #{project[:name]} => #{repo[:name]} => Dependabot configuration file does not exist"
     end
 
@@ -77,12 +77,15 @@ class AzureProcessor
 
       get("#{@api_endpoint}/#{project[:id]}/_apis/git/repositories/#{repo[:id]}/items?path=azure-pipelines.yml")
     rescue NotFound
-      # generate_bug_azurepipeline(project, repo)
+      generate_bug_azurepipeline(project, repo)
       puts "#{@organisation} => #{project[:name]} => #{repo[:name]} => Azure Pipeline configuration file does not exist"
     end
   end
 
   def generate_bug_dependabotconfig(project, repo)
+    if !@createBugsIfMissing
+      return 
+    end
     puts "#{@organisation} => #{project[:name]} => #{repo[:name]} => Dependabot configuration file does not exist, raising bug if required..."
 
     bug_title = "[#{repo[:name]}] Configure Dependabot"
@@ -127,6 +130,9 @@ class AzureProcessor
     end
   end
   def generate_bug_azurepipeline(project, repo)
+    if !@createBugsIfMissing
+      return 
+    end
     puts "#{@organisation} => #{project[:name]} => #{repo[:name]} => Azure Pipeline configuration file does not exist, raising bug if required..."
 
     bug_title = "[#{repo[:name]}] Configure Azure Pipeline"
