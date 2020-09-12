@@ -69,17 +69,16 @@ class AzureProcessor
         .each { |update_config| process_dependency(project, repo, update_config) }
     rescue NotFound
       generate_bug_dependabotconfig(project, repo)
-      puts "#{@organisation} => #{project[:name]} => #{repo[:name]} => Dependabot configuration file does not exist"
     end
 
-    begin
-      puts "#{@organisation} => #{project[:name]} => #{repo[:name]} => Checking for Azure Pipeline configuration file..."
+    # commenting out for now. our pipeline ymls aren't in the root, and not sure why this matters.
+    # begin
+    #   puts "#{@organisation} => #{project[:name]} => #{repo[:name]} => Checking for Azure Pipeline configuration file..."
 
-      get("#{@api_endpoint}/#{project[:id]}/_apis/git/repositories/#{repo[:id]}/items?path=azure-pipelines.yml")
-    rescue NotFound
-      generate_bug_azurepipeline(project, repo)
-      puts "#{@organisation} => #{project[:name]} => #{repo[:name]} => Azure Pipeline configuration file does not exist"
-    end
+    #   get("#{@api_endpoint}/#{project[:id]}/_apis/git/repositories/#{repo[:id]}/items?path=azure-pipelines.yml")
+    # rescue NotFound
+    #   generate_bug_azurepipeline(project, repo)
+    # end
   end
 
   def generate_bug_dependabotconfig(project, repo)
