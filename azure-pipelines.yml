@@ -1,6 +1,5 @@
 pool:
   name: Hosted Ubuntu 1604
-
 trigger: none
 
 pr: none
@@ -24,4 +23,8 @@ steps:
     envVars: |
      organisation=$(env.organisation)
      credentials=$(env.credentials)
+     projects=$(env.projects)
+     repos=$(env.repos)
+     createBugsIfMissing=$(env.createBugsIfMissing)
+     githubToken=$(env.githubToken)
     detached: false
